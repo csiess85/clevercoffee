@@ -250,6 +250,14 @@ int backflushON = 0;             // 1 = backflush mode active
 int flushCycles = 0;             // number of active flush cycles
 int backflushState = 10;         // counter for state machine
 
+
+// Debouncing brewSwitch
+const int numReadingsDebounce=15;
+int readingsDebounce[numReadingsDebounce];
+double averageDebounce=0;
+double totalDebounce=0;
+int debounceIndex=0;
+
 // Moving average for software brew detection
 double tempRateAverage = 0;             // average value of temp values
 double tempChangeRateAverageMin = 0;
@@ -723,6 +731,45 @@ char *number2string(unsigned int in) {
     return number2string_uint;
 }
 
+/** 
+ * @brief Brewswitch detection abstraction
+*/
+
+int brewSwitchHAL() {
+    switch (BREWSWITCHTYPE) {
+        // bouncing reed contact sensor
+        case 3:
+
+            // Debouncing brewSwitch
+            totalDebounce = totalDebounce - readingsDebounce[debounceIndex];
+            readingsDebounce[debounceIndex] = digitalRead(PIN_BREWSWITCH);
+            totalDebounce = totalDebounce + readingsDebounce[debounceIndex];
+            debounceIndex = debounceIndex + 1;
+            if (debounceIndex>=numReadingsDebounce) {
+                debounceIndex=0;
+            }
+            averageDebounce = totalDebounce / numReadingsDebounce;
+
+            if (averageDebounce>0) {
+                return(VoltageSensorON);
+            }
+
+            if (averageDebounce==0) {
+                return(VoltageSensorOFF);
+            }
+
+
+            break;
+
+        default:
+            return (digitalRead(PIN_BREWSWITCH));
+    } 
+
+    //we should never end here
+    return(-1);
+}
+
+
 
 /**
  * @brief detect if a brew is running
@@ -747,13 +794,13 @@ void brewDetection() {
         }
     } else if (brewDetectionMode == 3) {
         // timeBrewed counter
-        if ((digitalRead(PIN_BREWSWITCH) == VoltageSensorON) && brewDetected == 1) {
+        if ((brewSwitchHAL() == VoltageSensorON) && brewDetected == 1) {
             timeBrewed = millis() - startingTime;
             lastbrewTime = timeBrewed;
         }
 
         // OFF: reset brew
-        if ((digitalRead(PIN_BREWSWITCH) == VoltageSensorOFF) && (brewDetected == 1 || coolingFlushDetectedQM == true)) {
+        if ((brewSwitchHAL() == VoltageSensorOFF) && (brewDetected == 1 || coolingFlushDetectedQM == true)) {
             isBrewDetected = 0;  // rearm brewDetection
             brewDetected = 0;
             timePVStoON = timeBrewed;  // for QuickMill
@@ -783,7 +830,7 @@ void brewDetection() {
         switch (machine) {
             case QuickMill:
                 if (!coolingFlushDetectedQM) {
-                    int pvs = digitalRead(PIN_BREWSWITCH);
+                    int pvs = brewSwitchHAL();
 
                     if (pvs == VoltageSensorON && brewDetected == 0 &&
                         brewSteamDetectedQM == 0 && !steamQM_active) {
@@ -828,7 +875,7 @@ void brewDetection() {
             default:
                 previousMillisVoltagesensorreading = millis();
 
-                if (digitalRead(PIN_BREWSWITCH) == VoltageSensorON && brewDetected == 0) {
+                if (brewSwitchHAL() == VoltageSensorON && brewDetected == 0) {
                     debugPrintln("HW Brew - Voltage Sensor - Start");
                     timeBrewDetection = millis();
                     startingTime = millis();
@@ -2222,6 +2269,11 @@ void looppid() {
             debugPrintf("brewtimesoftware %f\n", brewtimesoftware);
             debugPrintf("isBrewDetected %i\n", isBrewDetected);
             debugPrintf("brewDetectionMode %i\n", brewDetectionMode);
+
+            // BrewDetection Debounce
+            #if ( BREWSWITCHTYPE == 3)
+            debugPrintf("AverageDebounce: %f\n\n", averageDebounce);
+            #endif
         }
         #endif
     }
