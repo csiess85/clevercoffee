@@ -257,6 +257,8 @@ int readingsDebounce[numReadingsDebounce];
 double averageDebounce=0;
 double totalDebounce=0;
 int debounceIndex=0;
+unsigned long lastHIGH=0;
+const double reedSwitchDelay=200;
 
 // Moving average for software brew detection
 double tempRateAverage = 0;             // average value of temp values
@@ -739,7 +741,17 @@ int brewSwitchHAL() {
     switch (BREWSWITCHTYPE) {
         // bouncing reed contact sensor
         case 3:
+            int tmpRead;
+            tmpRead=digitalRead(PIN_BREWSWITCH);
+            if (tmpRead == VoltageSensorON) {
+                lastHIGH = millis();
+                return(VoltageSensorON);
+            }
 
+            if ((tmpRead == VoltageSensorOFF) && ((millis()-lastHIGH > reedSwitchDelay))) {
+                return(VoltageSensorOFF);
+            }
+            /*
             // Debouncing brewSwitch
             totalDebounce = totalDebounce - readingsDebounce[debounceIndex];
             readingsDebounce[debounceIndex] = digitalRead(PIN_BREWSWITCH);
@@ -757,7 +769,7 @@ int brewSwitchHAL() {
             if (averageDebounce==0) {
                 return(VoltageSensorOFF);
             }
-
+            */
 
             break;
 
