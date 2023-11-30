@@ -748,22 +748,31 @@ int brewSwitchHAL() {
             if (state == VoltageSensorON) {
                 
                 lastHIGH = millis();
+                #if VERBOSE
                 debugPrintf("got high on %lu\n",lastHIGH);
+                #endif
+
                 return(VoltageSensorON);
             } 
+            #if VERBOSE
             if (state == VoltageSensorOFF) {
+                
                 debugPrintf("got low on %lu\n",millis());
                 int tmp=millis()-lastHIGH;
                 debugPrintf("DIFF millis()-lastHIGH %d\n",(tmp) );
                 debugPrintf("reedSwitchDelay %d\n",reedSwitchDelay );
+                
             }
-
+            #endif          
             if ((state == VoltageSensorOFF) && ((millis()-lastHIGH > reedSwitchDelay))) {
                 //debugPrintf("got low on %lu\n",millis());
                 //int tmp=millis()-lastHIGH;
                 //debugPrintf("DIFF millis()-lastHIGH %d\n",(tmp) );
                 //debugPrintf("reedSwitchDelay %d\n",reedSwitchDelay );
+                #if VERBOSE
                 debugPrintf("returning VoltageSensorOFF\n");
+                #endif
+                
                 return(VoltageSensorOFF);
             }
             
